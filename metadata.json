@@ -1,0 +1,7 @@
+{
+  "name": "FinSight AI: Smart Expense Tracker",
+  "description": "AI-powered financial behavior analyzer with receipt scanning, subscription detection, and personalized saving suggestions.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
