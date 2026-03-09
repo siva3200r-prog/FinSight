@@ -1,0 +1,44 @@
+Traceback (most recent call last):
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\test_import.py", line 3, in <module>
+    from app import main
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\app\main.py", line 30, in <module>
+    from app.routers import expenses, subscriptions, budget, insights, ocr, dashboard
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\app\routers\subscriptions.py", line 5, in <module>
+    from app.services.gmail_service import GmailService
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\app\services\gmail_service.py", line 13, in <module>
+    import spacy
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\__init__.py", line 13, in <module>
+    from . import pipeline  # noqa: F401
+    ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\pipeline\__init__.py", line 1, in <module>
+    from .attributeruler import AttributeRuler
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\pipeline\attributeruler.py", line 10, in <module>
+    from ..language import Language
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\language.py", line 46, in <module>
+    from .pipe_analysis import analyze_pipes, print_pipe_analysis, validate_attrs
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\pipe_analysis.py", line 6, in <module>
+    from .tokens import Doc, Span, Token
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\tokens\__init__.py", line 1, in <module>
+    from ._serialize import DocBin
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\tokens\_serialize.py", line 14, in <module>
+    from ..vocab import Vocab
+  File "spacy/vocab.pyx", line 1, in init spacy.vocab
+  File "spacy/tokens/doc.pyx", line 49, in init spacy.tokens.doc
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\spacy\schemas.py", line 338, in <module>
+    class TokenPatternSchema(BaseModel):
+    ...<3 lines>...
+            extra = "forbid"
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\pydantic\v1\main.py", line 221, in __new__
+    inferred = ModelField.infer(
+        name=var_name,
+    ...<3 lines>...
+        config=config,
+    )
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\pydantic\v1\fields.py", line 502, in infer
+    annotation = get_annotation_from_field_info(annotation, field_info, name, config.validate_assignment)
+  File "C:\Users\siva3\Downloads\Fin Sights\backend\venv\Lib\site-packages\pydantic\v1\schema.py", line 1021, in get_annotation_from_field_info
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: On field "pattern" the following field constraints are set but not enforced: min_items. 
+For more details see https://docs.pydantic.dev/usage/schema/#unenforced-field-constraints

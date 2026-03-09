@@ -22,6 +22,17 @@ export interface Goal {
   created_at: string;
 }
 
+export interface Subscription {
+  id?: number;
+  merchant_name: string;
+  category: string;
+  amount: number;
+  billing_cycle: 'Monthly' | 'Yearly';
+  last_date: string;
+  next_expected_date: string;
+  yearly_cost: number;
+}
+
 export type Category = 
   | 'Food' 
   | 'Transport' 

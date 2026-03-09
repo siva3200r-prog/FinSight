@@ -60,4 +60,41 @@ export const api = {
     const res = await fetch("/api/subscriptions/detect");
     return res.json();
   },
+  async addSubscription(subscription: any) {
+    // Add as a subscription-type expense through the Node.js server
+    const res = await fetch("/api/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...subscription,
+        amount: subscription.amount || subscription.monthly_cost || 0,
+        category: subscription.category || "Subscription",
+        description: subscription.service_name || subscription.name || "Subscription",
+        date: subscription.last_payment_date || new Date().toISOString().split('T')[0],
+        is_subscription: true,
+      }),
+    });
+    return res.json().catch(() => ({ id: Math.random() }));
+  },
+  async importGmailSubscriptions(email: string) {
+    // Mock data since Gmail API requires OAuth setup
+    return [
+      {
+        name: "Netflix",
+        amount: 199,
+        category: "Entertainment",
+        billingCycle: "Monthly",
+        lastPayment: "2026-03-05",
+        nextRenewal: "2026-04-05"
+      },
+      {
+        name: "Spotify",
+        amount: 119,
+        category: "Entertainment",
+        billingCycle: "Monthly",
+        lastPayment: "2026-03-01",
+        nextRenewal: "2026-04-01"
+      }
+    ];
+  },
 };

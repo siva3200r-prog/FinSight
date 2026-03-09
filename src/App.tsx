@@ -41,6 +41,9 @@ import { useDropzone } from 'react-dropzone';
 import { api } from './services/api';
 import { scanReceipt, getFinancialInsights, chatWithAdvisor } from './services/ai';
 import { Expense, Goal, Category, PaymentMethod, PurchaseLocation, Mood, Classification } from './types';
+import { AddExpenseModal } from './components/AddExpenseModal';
+import { AddSubscriptionModal } from './components/AddSubscriptionModal';
+import { GmailSubscriptionImport } from './components/GmailSubscriptionImport';
 
 const CATEGORIES: Category[] = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Utilities', 'Health', 'Education', 'Other'];
 const COLORS = ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#f1f5f9'];
@@ -97,7 +100,9 @@ export default function App() {
   const [insights, setInsights] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'expenses' | 'goals' | 'advisor' | 'subscriptions'>('dashboard');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const [isAddingSubscription, setIsAddingSubscription] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanningMode, setScanningMode] = useState<'expense' | 'subscription'>('expense');
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -118,24 +123,27 @@ export default function App() {
     setSubscriptions(subs);
   };
 
-  const handleAddExpense = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const expense = {
-      amount: Number(formData.get('amount')),
-      category: formData.get('category') as Category,
-      description: formData.get('description') as string,
-      date: formData.get('date') as string,
-      is_subscription: formData.get('is_subscription') === 'on',
-      merchant_name: formData.get('merchant_name') as string,
-      payment_method: formData.get('payment_method') as PaymentMethod,
-      location: formData.get('location') as PurchaseLocation,
-      mood: formData.get('mood') as Mood,
-      classification: formData.get('classification') as Classification,
-    };
+  const handleAddExpense = async (expense: Omit<Expense, "id" | "created_at">) => {
     await api.addExpense(expense);
     setIsAddingExpense(false);
     loadData();
+  };
+
+  const handleAddSubscription = async (sub: any) => {
+    await api.addSubscription(sub);
+    // Locally add it if the backend mock doesn't persist POSTs
+    setSubscriptions(prev => [{ ...sub, id: Math.random() }, ...prev]);
+    setIsAddingSubscription(false);
+    // In a real app we'd just call loadData(), but since it's mocked let's do both
+    loadData();
+  };
+
+  const handleGmailImportSuccess = (newSubs: any[]) => {
+    setSubscriptions(prev => {
+      const existingNames = new Set(prev.map(s => s.merchant_name));
+      const filteredNew = newSubs.filter(s => !existingNames.has(s.merchant_name));
+      return [...filteredNew, ...prev];
+    });
   };
 
   const handleDeleteExpense = async (id: number) => {
@@ -478,7 +486,7 @@ export default function App() {
                             <div className="w-full bg-slate-100 h-1.5 rounded-full">
                               <div
                                 className="bg-slate-900 h-full rounded-full"
-                                style={{ width: `${(count / displayExpenses.length) * 100}%` }}
+                                style={{ width: `${(Number(count) / displayExpenses.length) * 100}%` }}
                               ></div>
                             </div>
                           </div>
@@ -558,7 +566,7 @@ export default function App() {
                     <p className="text-slate-500">Manage and track all your transactions.</p>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => setIsScanning(true)} className="btn-secondary flex items-center gap-2">
+                    <button onClick={() => { setScanningMode('expense'); setIsScanning(true); }} className="btn-secondary flex items-center gap-2">
                       <Receipt size={20} /> Scan Receipt
                     </button>
                     <button onClick={() => setIsAddingExpense(true)} className="btn-primary flex items-center gap-2">
@@ -623,13 +631,25 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-6"
               >
-                <header>
-                  <h2 className="text-3xl font-bold tracking-tight">Recurring Subscriptions</h2>
-                  <p className="text-slate-500">Automatically detected recurring payments from your history.</p>
+                <header className="flex justify-between items-end mb-6">
+                  <div>
+                    <h2 className="text-3xl font-bold tracking-tight">Recurring Subscriptions</h2>
+                    <p className="text-slate-500">Automatically detected and manually added recurring payments.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setScanningMode('subscription'); setIsScanning(true); }} className="btn-secondary flex items-center gap-2">
+                      <Receipt size={20} /> Scan Receipt
+                    </button>
+                    <button onClick={() => setIsAddingSubscription(true)} className="btn-primary flex items-center gap-2">
+                      <Plus size={20} /> Add Subscription
+                    </button>
+                  </div>
                 </header>
 
+                <GmailSubscriptionImport onImportSuccess={handleGmailImportSuccess} />
+
                 {subscriptions.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                     <StatCard
                       title="Total Subscriptions"
                       value={subscriptions.length.toString()}
@@ -777,126 +797,17 @@ export default function App() {
 
       {/* Modals */}
       <AnimatePresence>
-        {isAddingExpense && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold">Add Expense</h3>
-                <button onClick={() => setIsAddingExpense(false)} className="text-slate-400 hover:text-slate-900"><X /></button>
-              </div>
-              <form onSubmit={handleAddExpense} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Amount (₹)</label>
-                    <div className="relative">
-                      <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input name="amount" type="number" step="0.01" required className="input !pl-12" placeholder="0.00" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Category</label>
-                    <div className="relative">
-                      <LucidePieChart className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select name="category" className="input !pl-12 appearance-none">
-                        {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
+        <AddExpenseModal
+          isOpen={isAddingExpense}
+          onClose={() => setIsAddingExpense(false)}
+          onAdd={handleAddExpense as any}
+        />
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Description</label>
-                  <input name="description" type="text" required className="input" placeholder="What did you buy?" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Merchant Name</label>
-                    <div className="relative">
-                      <ShoppingBag className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input name="merchant_name" type="text" required className="input !pl-12" placeholder="e.g. Amazon, Swiggy" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Date</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input name="date" type="date" required className="input !pl-12" defaultValue={new Date().toISOString().split('T')[0]} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Payment Method</label>
-                    <div className="relative">
-                      <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select name="payment_method" className="input !pl-12 appearance-none">
-                        <option value="UPI">UPI</option>
-                        <option value="Credit Card">Credit Card</option>
-                        <option value="Debit Card">Debit Card</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Net Banking">Net Banking</option>
-                        <option value="Wallet">Wallet</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Location</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select name="location" className="input !pl-12 appearance-none">
-                        <option value="Online">Online</option>
-                        <option value="Supermarket">Supermarket</option>
-                        <option value="Restaurant">Restaurant</option>
-                        <option value="Fuel Station">Fuel Station</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Mood / Reason</label>
-                    <div className="relative">
-                      <Smile className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select name="mood" className="input !pl-12 appearance-none">
-                        <option value="Regular">Regular</option>
-                        <option value="Stress shopping">Stress shopping</option>
-                        <option value="Celebration">Celebration</option>
-                        <option value="Hunger">Hunger</option>
-                        <option value="Impulse purchase">Impulse purchase</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Classification</label>
-                    <div className="relative">
-                      <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select name="classification" className="input !pl-12 appearance-none">
-                        <option value="Essential">Essential</option>
-                        <option value="Non-Essential">Non-Essential</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-4 bg-slate-900/5 rounded-2xl border border-slate-900/10">
-                  <input name="is_subscription" type="checkbox" id="sub" className="w-6 h-6 rounded-lg border-slate-300 text-slate-900 focus:ring-slate-900" />
-                  <label htmlFor="sub" className="text-sm font-bold text-slate-700">Recurring Subscription</label>
-                </div>
-                <button type="submit" className="w-full btn-primary py-4 mt-4 text-lg">Save Expense</button>
-              </form>
-            </motion.div>
-          </div>
-        )}
+        <AddSubscriptionModal
+          isOpen={isAddingSubscription}
+          onClose={() => setIsAddingSubscription(false)}
+          onAdd={handleAddSubscription as any}
+        />
 
         {isScanning && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -910,7 +821,10 @@ export default function App() {
                 <h3 className="text-2xl font-bold">Scan Receipt</h3>
                 <button onClick={() => setIsScanning(false)} className="text-slate-400 hover:text-slate-900"><X /></button>
               </div>
-              <ReceiptScanner onComplete={() => { setIsScanning(false); loadData(); }} />
+              <ReceiptScanner
+                onComplete={() => { setIsScanning(false); loadData(); }}
+                isSubscriptionMode={scanningMode === 'subscription'}
+              />
             </motion.div>
           </div>
         )}
@@ -1064,15 +978,17 @@ function StatCard({ title, value, trend, trendUp, icon: Icon }: { title: string,
   );
 }
 
-function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
+function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete: () => void, isSubscriptionMode?: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const onDrop = (acceptedFiles: File[]) => {
     const f = acceptedFiles[0];
     setFile(f);
+    setScanError(null);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(f);
@@ -1082,16 +998,27 @@ function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
     onDrop,
     accept: { 'image/*': [] },
     multiple: false
-  });
+  } as any);
 
   const handleScan = async () => {
     if (!preview) return;
     setIsProcessing(true);
+    setScanError(null);
     try {
       const data = await scanReceipt(preview);
-      setResult(data);
-    } catch (error) {
+      if (!data || (!data.amount && !data.description)) {
+        setScanError("Could not extract data from this receipt. Please check your GEMINI_API_KEY in the .env file.");
+      } else {
+        setResult(data);
+      }
+    } catch (error: any) {
       console.error(error);
+      const msg = error?.message || String(error);
+      if (msg.includes("API key") || msg.includes("apiKey") || msg.includes("401") || msg.includes("403")) {
+        setScanError("Gemini API key is missing or invalid. Please add your GEMINI_API_KEY to the .env file in the project root.");
+      } else {
+        setScanError(`AI analysis failed: ${msg}`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -1099,13 +1026,34 @@ function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
 
   const handleSave = async () => {
     if (!result) return;
-    await api.addExpense({
-      ...result,
-      is_subscription: false,
-      date: new Date().toISOString().split('T')[0],
-      location: 'Other',
-      mood: 'Regular',
-    });
+
+    if (isSubscriptionMode) {
+      await api.addExpense({
+        ...result,
+        is_subscription: true,
+        date: new Date().toISOString().split('T')[0],
+        location: 'Other',
+        mood: 'Regular',
+      });
+      // Also add it purely as a subscription model for the ui logic
+      await api.addSubscription({
+        service_name: result.merchant_name || 'Unknown Subscription',
+        amount: result.amount || 0,
+        billing_cycle: 'Monthly',
+        last_payment_date: result.date || new Date().toISOString().split('T')[0],
+        next_payment_date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+        category: result.category || 'Other'
+      });
+    } else {
+      await api.addExpense({
+        ...result,
+        is_subscription: false,
+        date: new Date().toISOString().split('T')[0],
+        location: 'Other',
+        mood: 'Regular',
+      });
+    }
+
     onComplete();
   };
 
@@ -1126,6 +1074,13 @@ function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
             <button onClick={() => { setPreview(null); setResult(null); }} className="absolute top-2 right-2 p-1 bg-white/80 backdrop-blur rounded-full shadow-sm"><X size={16} /></button>
           </div>
 
+          {scanError && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700">
+              <p className="font-bold mb-1">⚠️ Analysis Failed</p>
+              <p>{scanError}</p>
+            </div>
+          )}
+
           {result ? (
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex justify-between items-center">
@@ -1134,8 +1089,8 @@ function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-slate-500">Amount</p>
-                  <p className="font-bold">₹{result.amount}</p>
+                  <p className="text-xs text-slate-500">Total Amount</p>
+                  <p className="font-bold text-lg">{result.currency || '₹'}{result.amount}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Category</p>
@@ -1146,18 +1101,36 @@ function ReceiptScanner({ onComplete }: { onComplete: () => void }) {
                   <p className="font-bold">{result.merchant_name || 'Unknown'}</p>
                 </div>
                 <div>
+                  <p className="text-xs text-slate-500">Date</p>
+                  <p className="font-bold">{result.date || 'Unknown'}</p>
+                </div>
+                <div>
                   <p className="text-xs text-slate-500">Payment Method</p>
                   <p className="font-bold">{result.payment_method || 'Unknown'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Classification</p>
+                  <p className="font-bold">{result.classification || 'Essential'}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-slate-500">Description</p>
                   <p className="font-bold">{result.description}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Classification</p>
-                  <p className="font-bold">{result.classification || 'Essential'}</p>
-                </div>
               </div>
+
+              {result.items && result.items.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-200">
+                  <p className="text-xs font-bold uppercase text-slate-400 mb-2">Itemized Breakdown</p>
+                  <div className="space-y-1">
+                    {result.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-slate-700">{item.item_name}</span>
+                        <span className="font-medium text-slate-900">{result.currency || '₹'}{item.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <button
