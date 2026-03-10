@@ -27,6 +27,11 @@ def _patched_get_annotation(*args, **kwargs):
 
 pydantic.v1.schema.get_annotation_from_field_info = _patched_get_annotation
 # ----------------------------------------------------
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 from app.routers import expenses, subscriptions, budget, insights, ocr, dashboard
 
@@ -40,6 +45,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    print("INFO: Performing startup diagnostic checks...")
+    # Check OpenAI client initialization
+    success, message = ocr.ocr_service.test_connection()
+    if success:
+        print(f"INFO: OCR Client Check: SUCCESS ({message})")
+    else:
+        print(f"WARNING: OCR Client Check: FAILED - {message}")
 
 @app.get("/")
 def read_root():

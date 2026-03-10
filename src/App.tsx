@@ -1001,12 +1001,12 @@ function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete
   } as any);
 
   const handleScan = async () => {
-    if (!preview) return;
+    if (!file) return;
     setIsProcessing(true);
     setScanError(null);
     try {
-      const data = await scanReceipt(preview);
-      if (!data || (!data.amount && !data.description)) {
+      const data = await scanReceipt(file);
+      if (!data || (!data.total_amount && !data.merchant)) {
         setScanError("Could not extract data from this receipt. Please check your GEMINI_API_KEY in the .env file.");
       } else {
         setResult(data);
@@ -1029,16 +1029,20 @@ function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete
 
     if (isSubscriptionMode) {
       await api.addExpense({
-        ...result,
+        amount: result.total_amount || 0,
+        category: result.category || 'Subscription',
+        description: result.merchant || 'Subscription',
+        date: result.date || new Date().toISOString().split('T')[0],
+        merchant_name: result.merchant || 'Unknown',
+        payment_method: result.payment_method,
         is_subscription: true,
-        date: new Date().toISOString().split('T')[0],
         location: 'Other',
         mood: 'Regular',
       });
       // Also add it purely as a subscription model for the ui logic
       await api.addSubscription({
-        service_name: result.merchant_name || 'Unknown Subscription',
-        amount: result.amount || 0,
+        service_name: result.merchant || 'Unknown Subscription',
+        amount: result.total_amount || 0,
         billing_cycle: 'Monthly',
         last_payment_date: result.date || new Date().toISOString().split('T')[0],
         next_payment_date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
@@ -1046,9 +1050,13 @@ function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete
       });
     } else {
       await api.addExpense({
-        ...result,
+        amount: result.total_amount || 0,
+        category: result.category || 'Other',
+        description: result.merchant || 'Expense',
+        date: result.date || new Date().toISOString().split('T')[0],
+        merchant_name: result.merchant || 'Unknown',
+        payment_method: result.payment_method,
         is_subscription: false,
-        date: new Date().toISOString().split('T')[0],
         location: 'Other',
         mood: 'Regular',
       });
@@ -1090,15 +1098,15 @@ function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-slate-500">Total Amount</p>
-                  <p className="font-bold text-lg">{result.currency || '₹'}{result.amount}</p>
+                  <p className="font-bold text-lg">{result.currency || '₹'}{result.total_amount}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Category</p>
-                  <p className="font-bold">{result.category}</p>
+                  <p className="font-bold">{result.category || 'Other'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Merchant</p>
-                  <p className="font-bold">{result.merchant_name || 'Unknown'}</p>
+                  <p className="font-bold">{result.merchant || 'Unknown'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Date</p>
@@ -1113,8 +1121,8 @@ function ReceiptScanner({ onComplete, isSubscriptionMode = false }: { onComplete
                   <p className="font-bold">{result.classification || 'Essential'}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Description</p>
-                  <p className="font-bold">{result.description}</p>
+                  <p className="text-xs text-slate-500">Raw Text Preview</p>
+                  <p className="text-[10px] text-slate-400 font-mono line-clamp-3">{result.raw_text}</p>
                 </div>
               </div>
 

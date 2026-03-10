@@ -97,4 +97,25 @@ export const api = {
       }
     ];
   },
+  async uploadReceipt(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    // Call the Python AI backend directly on port 8000
+    const res = await fetch("http://localhost:8000/api/ocr/upload", {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ detail: "Unknown server error" }));
+      throw new Error(errorData.detail || errorData.error || "OCR upload failed");
+    }
+    
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    return data;
+  },
 };
